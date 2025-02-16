@@ -7,71 +7,57 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Allow frontend domain for CORS
-const allowedOrigin = 'https://feiyuwu.github.io'; // No trailing slash
-
-app.use(
-  cors({
-    origin: allowedOrigin,
-    methods: 'GET,POST',
-    allowedHeaders: 'Content-Type',
-  })
-);
-
+app.use(cors()); // Allow all origins or specify frontend domain
 app.use(bodyParser.json());
 
 const filePath = path.join(__dirname, 'data.json');
 
-// ✅ Ensure `data.json` exists
+// Ensure the file exists with an empty array if not present
 if (!fs.existsSync(filePath)) {
-  fs.writeFileSync(filePath, '[]'); // Use an array to store multiple records
+  fs.writeFileSync(filePath, '[]');
 }
 
-// ✅ Fetch all stored key-content pairs
-app.get('/data', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-
-  const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-  if (existingData.length > 0) {
-    res.json(existingData);
-  } else {
-    res.status(404).json({ message: 'No data found' });
-  }
-});
-
-// ✅ Fetch stored content by key
-app.get('/data/:key', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-
-  const requestedKey = req.params.key;
-  const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-  const entry = existingData.find((item) => item.key === requestedKey);
-  if (entry) {
-    res.json(entry);
-  } else {
-    res.status(404).json({ message: 'No data found for this key' });
-  }
-});
-
-// ✅ Append new key-content pairs and save the updated data
+// ✅ POST route to save new data (Appending instead of overwriting)
 app.post('/save', (req, res) => {
-  const newData = req.body; // Expecting an array
+  const { key, content } = req.body;
 
-  if (!Array.isArray(newData)) {
-    return res
-      .status(400)
-      .json({ message: 'Invalid data format. Expected an array.' });
+  if (!key || !content) {
+    return res.status(400).json({ message: 'Key and content are required' });
   }
 
-  fs.writeFileSync(filePath, JSON.stringify(newData, null, 2));
+  try {
+    // Step 1: Read the existing data
+    let existingData = [];
+    if (fs.existsSync(filePath)) {
+      existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    }
 
-  res.json({ message: 'Data updated successfully!' });
+    // Step 2: Append the new entry
+    existingData.push({ key, content });
+
+    // Step 3: Write updated data back to the file
+    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+
+    res.json({ message: 'Data saved successfully!', key });
+  } catch (error) {
+    console.error('Error writing data:', error);
+    res.status(500).json({ message: 'Error saving data' });
+  }
+});
+
+// ✅ GET route to fetch all stored data (Optional)
+app.get('/data', (req, res) => {
+  try {
+    const data = fs.existsSync(filePath)
+      ? JSON.parse(fs.readFileSync(filePath, 'utf8'))
+      : [];
+    res.json(data);
+  } catch (error) {
+    console.error('Error reading data:', error);
+    res.status(500).json({ message: 'Error fetching data' });
+  }
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Backend running on http://localhost:${PORT}`);
+  console.log(`✅ Backend running on port ${PORT}`);
 });
