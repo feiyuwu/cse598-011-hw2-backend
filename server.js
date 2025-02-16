@@ -7,17 +7,27 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Allow frontend domain for CORS
-app.use(cors({ origin: 'https://cse598-011-hw2.onrender.com' }));
+// ✅ Allow frontend domain for CORS (NO TRAILING SLASH)
+const allowedOrigin = 'https://feiyuwu.github.io/cse598-011-hw2';
+
+app.use(
+  cors({
+    origin: allowedOrigin,
+    methods: 'GET,POST',
+    allowedHeaders: 'Content-Type',
+  })
+);
 
 app.use(bodyParser.json());
 
 const filePath = path.join(__dirname, 'data.json');
 
+// ✅ Ensure data.json exists
 if (!fs.existsSync(filePath)) {
-  fs.writeFileSync(filePath, '[]');
+  fs.writeFileSync(filePath, '{}'); // Use an object to store keys
 }
 
+// ✅ Endpoint to receive and store page content with a unique key
 app.post('/save', (req, res) => {
   const { key, content } = req.body;
 
@@ -26,25 +36,27 @@ app.post('/save', (req, res) => {
   }
 
   let existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  existingData.push({ key, content });
+
+  // ✅ Store the data by key
+  existingData[key] = content;
 
   fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
 
   res.json({ message: 'Data saved successfully!', key });
 });
 
-app.get('/data', (req, res) => {
-  res.setHeader(
-    'Access-Control-Allow-Origin',
-    'https://cse598-011-hw2.onrender.com'
-  ); // ✅ Fix missing CORS header
+// ✅ Endpoint to fetch stored content by key
+app.get('/data/:key', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin); // ✅ Fix missing CORS header
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  const filePath = 'data.json';
-  if (fs.existsSync(filePath)) {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    res.json({ content: data.length ? data[data.length - 1].content : '' });
+  const requestedKey = req.params.key;
+  const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  if (existingData[requestedKey]) {
+    res.json({ key: requestedKey, content: existingData[requestedKey] });
   } else {
-    res.json({ content: '' });
+    res.status(404).json({ message: 'No data found for this key' });
   }
 });
 
