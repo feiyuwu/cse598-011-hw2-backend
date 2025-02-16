@@ -7,8 +7,8 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Allow frontend domain for CORS (NO TRAILING SLASH)
-const allowedOrigin = 'https://feiyuwu.github.io/cse598-011-hw2';
+// ✅ Ensure correct CORS settings
+const allowedOrigin = 'https://feiyuwu.github.io'; // No trailing slash
 
 app.use(
   cors({
@@ -22,32 +22,28 @@ app.use(bodyParser.json());
 
 const filePath = path.join(__dirname, 'data.json');
 
-// ✅ Ensure data.json exists
+// ✅ Ensure `data.json` exists
 if (!fs.existsSync(filePath)) {
-  fs.writeFileSync(filePath, '{}'); // Use an object to store keys
+  fs.writeFileSync(filePath, '{}'); // Use an object to store key-value pairs
 }
 
-// ✅ Endpoint to receive and store page content with a unique key
-app.post('/save', (req, res) => {
-  const { key, content } = req.body;
+// ✅ Fetch all stored key-content pairs
+app.get('/data', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
 
-  if (!key || !content) {
-    return res.status(400).json({ message: 'Key and content are required' });
+  const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+
+  if (Object.keys(existingData).length > 0) {
+    res.json(existingData);
+  } else {
+    res.status(404).json({ message: 'No data found' });
   }
-
-  let existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-
-  // ✅ Store the data by key
-  existingData[key] = content;
-
-  fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
-
-  res.json({ message: 'Data saved successfully!', key });
 });
 
-// ✅ Endpoint to fetch stored content by key
+// ✅ Fetch stored content by key
 app.get('/data/:key', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin); // ✅ Fix missing CORS header
+  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET');
 
   const requestedKey = req.params.key;
@@ -58,6 +54,22 @@ app.get('/data/:key', (req, res) => {
   } else {
     res.status(404).json({ message: 'No data found for this key' });
   }
+});
+
+// ✅ Store key-content pairs
+app.post('/save', (req, res) => {
+  const { key, content } = req.body;
+
+  if (!key || !content) {
+    return res.status(400).json({ message: 'Key and content are required' });
+  }
+
+  let existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  existingData[key] = content;
+
+  fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+
+  res.json({ message: 'Data saved successfully!', key });
 });
 
 app.listen(PORT, () => {
