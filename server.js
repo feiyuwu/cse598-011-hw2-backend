@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Ensure correct CORS settings
+// ✅ Allow frontend domain for CORS
 const allowedOrigin = 'https://feiyuwu.github.io'; // No trailing slash
 
 app.use(
@@ -24,7 +24,7 @@ const filePath = path.join(__dirname, 'data.json');
 
 // ✅ Ensure `data.json` exists
 if (!fs.existsSync(filePath)) {
-  fs.writeFileSync(filePath, '{}'); // Use an object to store key-value pairs
+  fs.writeFileSync(filePath, '[]'); // Use an array to store multiple records
 }
 
 // ✅ Fetch all stored key-content pairs
@@ -34,7 +34,7 @@ app.get('/data', (req, res) => {
 
   const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-  if (Object.keys(existingData).length > 0) {
+  if (existingData.length > 0) {
     res.json(existingData);
   } else {
     res.status(404).json({ message: 'No data found' });
@@ -49,27 +49,27 @@ app.get('/data/:key', (req, res) => {
   const requestedKey = req.params.key;
   const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
 
-  if (existingData[requestedKey]) {
-    res.json({ key: requestedKey, content: existingData[requestedKey] });
+  const entry = existingData.find((item) => item.key === requestedKey);
+  if (entry) {
+    res.json(entry);
   } else {
     res.status(404).json({ message: 'No data found for this key' });
   }
 });
 
-// ✅ Store key-content pairs
+// ✅ Append new key-content pairs and save the updated data
 app.post('/save', (req, res) => {
-  const { key, content } = req.body;
+  const newData = req.body; // Expecting an array
 
-  if (!key || !content) {
-    return res.status(400).json({ message: 'Key and content are required' });
+  if (!Array.isArray(newData)) {
+    return res
+      .status(400)
+      .json({ message: 'Invalid data format. Expected an array.' });
   }
 
-  let existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  existingData[key] = content;
+  fs.writeFileSync(filePath, JSON.stringify(newData, null, 2));
 
-  fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
-
-  res.json({ message: 'Data saved successfully!', key });
+  res.json({ message: 'Data updated successfully!' });
 });
 
 app.listen(PORT, () => {
